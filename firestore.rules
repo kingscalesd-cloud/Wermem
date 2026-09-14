@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email;
+
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // Users may edit profile/contact/preferences only.
+      // Server-managed identity, referral and plan fields remain protected.
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.referralCode == resource.data.referralCode
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'username', 'phone', 'age', 'photoURL', 'settings', 'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    // Subscription/plan information is intentionally server-managed.
+    match /subscriptions/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
